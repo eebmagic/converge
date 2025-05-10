@@ -1,3 +1,5 @@
 server/data.json
 server/*.txt
+server/.env
+frontend/.env
 .venv/
