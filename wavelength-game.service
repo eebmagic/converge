@@ -1,0 +1,11 @@
+[Unit]
+Description=Webserver for wavelength game
+After=network.target
+
+[Service]
+ExecStart=/root/.nix-profile/bin/nix-shell
+Restart=always
+WorkingDirectory=/root/Projects/wavelength
+
+[Install]
+WantedBy=multi-user.target
