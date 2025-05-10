@@ -22,7 +22,38 @@ function App() {
     });
   };
 
-  console.log('loaded google client id', process.env.REACT_APP_GOOGLE_CLIENT_ID);  
+  function parseJwt(token) {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  }
+
+  function Details() {
+    return (
+      <div>
+        <h1>Details</h1>
+        <GoogleLogin
+          onSuccess={credentialResponse => {
+            console.log('CRED RESPONSE', credentialResponse);
+            const userInfo = parseJwt(credentialResponse.credential);
+            console.log(userInfo);
+            showToast('success', 'Login Successful', 'Welcome ' + userInfo.name);
+          }}
+          onError={() => {
+            console.log('Login Failed');
+          }}
+        />
+      </div>
+    )
+  };
 
   return (
     <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
@@ -42,14 +73,8 @@ function App() {
           <img src={githubMark} alt="GitHub Mark" style={{ width: '30px', height: '30px', filter: 'invert(100%)' }} />
         </a>
 
-          <GoogleLogin
-            onSuccess={credentialResponse => {
-              console.log('CRED RESPONSE', credentialResponse);
-            }}
-            onError={() => {
-              console.log('Login Failed');
-            }}
-          />
+          <Details />
+
         </header>
       </div>
     </GoogleOAuthProvider>
