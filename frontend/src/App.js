@@ -9,6 +9,7 @@ import { Button } from 'primereact/button';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 import githubMark from './images/github-mark.svg';
+import api from './helpers/api';
 
 
 function App() {
@@ -42,7 +43,7 @@ function App() {
     return JSON.parse(jsonPayload);
   }
 
-  const processCreds = (creds, notify = true) => {
+  const processCreds = async (creds, notify = true) => {
     const userInfo = parseJwt(creds.credential);
     const currentTime = Math.floor(Date.now() / 1000);
     if (userInfo.exp < currentTime) {
@@ -51,17 +52,31 @@ function App() {
       return;
     }
 
+    try {
+      console.log('calling getUser');
+      const response = await api.getUser(userInfo);
+      console.log('got response from api helper', response);
+      if (response) {
+        console.log('got user', response);
+        localStorage.setItem('userCreds', JSON.stringify(creds));
+        setUser(response);
+      }
+    } catch (error) {
+      console.log('error getting user', error);
+      console.error('Error getting user:', error);
+    }
+
     if (notify) {
       showToast('success', 'Login Successful', 'Welcome ' + userInfo.name);
     }
-    localStorage.setItem('userCreds', JSON.stringify(creds));
-    setUser(userInfo);
   }
 
   useEffect(() => {
-    const userCreds = localStorage.getItem('userCreds');
-    if (userCreds) {
-      processCreds(JSON.parse(userCreds), false);
+    if (!user) {
+      const userCreds = localStorage.getItem('userCreds');
+      if (userCreds) {
+        processCreds(JSON.parse(userCreds), false);
+      }
     }
   }, []);
 
@@ -84,7 +99,7 @@ function App() {
           <h1>User Details</h1>
           <p>Welcome {user.name}</p>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-            <img src={user.picture} alt="User" />
+            <img src={user.details.picture} alt="User" />
           </div>
           <Button label="Logout" severity="danger" iconPos="right" icon="pi pi-sign-out" onClick={() => {
             localStorage.removeItem('userCreds');
