@@ -10,6 +10,7 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 import githubMark from './images/github-mark.svg';
 import api from './helpers/api';
+import utils from './helpers/utils';
 
 
 function App() {
@@ -29,22 +30,8 @@ function App() {
     });
   };
 
-  function parseJwt(token) {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  }
-
   const processCreds = async (creds, notify = true) => {
-    const userInfo = parseJwt(creds.credential);
+    const userInfo = utils.parseJwt(creds.credential);
     const currentTime = Math.floor(Date.now() / 1000);
     if (userInfo.exp < currentTime) {
       localStorage.removeItem('userCreds');
@@ -52,6 +39,7 @@ function App() {
       return;
     }
 
+    // Get or create the user on the server
     try {
       console.log('calling getUser');
       const response = await api.getUser(userInfo);
@@ -60,9 +48,10 @@ function App() {
         console.log('got user', response);
         localStorage.setItem('userCreds', JSON.stringify(creds));
         setUser(response);
+      } else {
+        console.error('Error getting user:', response);
       }
     } catch (error) {
-      console.log('error getting user', error);
       console.error('Error getting user:', error);
     }
 
@@ -78,7 +67,7 @@ function App() {
         processCreds(JSON.parse(userCreds), false);
       }
     }
-  }, []);
+  });
 
   function UserDetails() {
     if (!user) {
