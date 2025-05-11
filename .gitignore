@@ -1,5 +1,7 @@
 server/data.json
 server/*.txt
 server/.env
+server/__pycache__/
+
 frontend/.env
 .venv/
