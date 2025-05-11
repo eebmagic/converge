@@ -115,26 +115,46 @@ def get_full_game_state(gameID):
 
 ### 3. Service Functions ###
 
-# 3.1 Create a new game
-def create_game(gameID, p1, p2):
-    if not all([gameID, p1, p2]):
-        return {'error': 'Missing gameID or playerIDs', 'status_code': 400}
+# 3.1.1 Create a new game
+def create_game(gameID, p1):
     games_coll, _ = get_db_collections()
+    if not all([gameID, p1]):
+        return {'error': 'Missing gameID or player1ID', 'status_code': 400}
     now = datetime.utcnow()
     game = {
         'gameID': gameID,
         'player1ID': p1,
-        'player2ID': p2,
-        'currentRoundNumber': 1,
-        'status': 'in_progress',q
+        'player2ID': None,
+        'currentRoundNumber': None,
+        'status': 'pending',
         'createdAt': now,
         'updatedAt': now
     }
     games_coll.insert_one(game)
     return serialize_doc(game)
 
-# 3.2 Submit a guess (and possibly end or advance the game)
-def submit_guess(gameID, rn, userID, word):
+# 3.1.2 Join a game
+def join_game(gameID, p2):
+    games_coll, _ = get_db_collections()
+    if not all([gameID, p2]):
+        return {'error': 'Missing gameID or player2ID', 'status_code': 400}
+    now = datetime.utcnow()
+    res = games_coll.update_one(
+        {'gameID': gameID, 'status': 'pending'},
+        {'$set': {
+            'player2ID': p2,
+            'status': 'in_progress',
+            'currentRoundNumber': 1,
+            'updatedAt': now
+        }}
+    )
+    if res.matched_count == 0:
+        return {'error': 'Game not found or not pending', 'status_code': 404}
+    game = games_coll.find_one({'gameID': gameID})
+    return serialize_doc(game)
+
+# 3.2 Add a move (and possibly end or advance the game)
+def add_move(gameID, rn, userID, word):
     games_coll, rounds_coll = get_db_collections()
     if not userID or not word:
         return {'error':'Missing userID or word', 'status_code':400}
@@ -205,13 +225,13 @@ def submit_guess(gameID, rn, userID, word):
     payload = get_full_game_state(gameID)
     return {'success':True,'roundStage':'scored','game':payload}
 
-# 3.3 Get game state + history
-def get_game_state(gameID):
+# 3.3 Get game history
+def get_game(gameID):
     payload = get_full_game_state(gameID)
     return state if state else None
 
-# 3.4 End game (mark as lost)
-def end_game(gameID):
+# 3.4 Quit game (mark as lost)
+def quit_game(gameID):
     games_coll, _ = get_db_collections()
     res = games_coll.update_one(
         {'gameID': gameID},
@@ -222,3 +242,15 @@ def end_game(gameID):
 
     payload = get_full_game_state(gameID)
     return payload
+
+# 3.5 Get user's games
+def get_user_games(user_id):
+    '''
+    Gets IDs of all games that a user is involved in (joined or created)
+    '''
+    games_coll, _ = get_db_collections()
+    cursor = games_coll.find(
+        {'$or': [{'player1ID': user_id}, {'player2ID': user_id}]},
+        {'gameID': 1, '_id': 0}
+    )
+    return [g['gameID'] for g in cursor]

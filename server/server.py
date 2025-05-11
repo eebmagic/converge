@@ -20,21 +20,30 @@ games.mongo_client = mongo_client
 # Create a new game
 @app.route('/games', methods=['POST'])
 def create_game():
-    data   = request.get_json() or {}
+    data = request.get_json() or {}
     result = games.create_game(
         data.get('gameID'),
-        data.get('player1ID'),
+        data.get('player1ID')
+    )
+    status = result.pop('status_code', 200)
+    return jsonify(result), status
+
+# Join a game
+@app.route('/games/<gameID>/join', methods=['POST'])
+def join_game(gameID):
+    data = request.get_json() or {}
+    result = games.join_game(
+        gameID,
         data.get('player2ID')
     )
-    if 'error' in result:
-        return jsonify(result), 400
-    return jsonify(result), 200
+    status = result.pop('status_code', 200)
+    return jsonify(result), status
 
-# Submit a guess (and possibly end or advance the game)
-@app.route('/games/<gameID>/rounds/<int:rn>/guess', methods=['POST'])
-def submit_guess(gameID, rn):
+# Add a move (and possibly end or advance the game)
+@app.route('/games/<gameID>/rounds/<int:rn>/move', methods=['POST'])
+def add_move(gameID, rn):
     data   = request.get_json() or {}
-    result = games.submit_guess(
+    result = games.add_move(
         gameID, rn,
         data.get('userID'),
         data.get('word', '').strip().lower()
@@ -42,18 +51,27 @@ def submit_guess(gameID, rn):
     status = result.pop('status_code', 200)
     return jsonify(result), status
 
-# Get game state + history
+# Get game history
 @app.route('/games/<gameID>', methods=['GET'])
-def get_game_state(gameID):
-    result = games.get_game_state(gameID)
+def get_game(gameID):
+    result = games.get_game(gameID)
     if not result:
         return jsonify({'error': 'Game not found'}), 404
     return jsonify(result), 200
 
-# End game (mark as lost)
-@app.route('/games/<gameID>/end', methods=['POST'])
-def end_game(gameID):
-    result = games.end_game(gameID)
+# Get user's games
+@app.route('/users/<userID>/games', methods=['GET'])
+def get_user_games(userID):
+    """
+    List all gameIDs a user is involved in (as player1 or player2).
+    """
+    ids = games.get_user_games(userID)
+    return jsonify({'gameIDs': ids}), 200
+
+# Quit game (mark as lost)
+@app.route('/games/<gameID>/quit', methods=['POST'])
+def quit_game(gameID):
+    result = games.quit_game(gameID)
     if 'error' in result:
         return jsonify(result), 404
     return jsonify(result), 200
