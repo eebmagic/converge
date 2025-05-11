@@ -15,6 +15,10 @@ function App() {
   const toast = useRef(null);
   const [user, setUser] = useState(null);
 
+  if (!process.env.REACT_APP_GOOGLE_CLIENT_ID) {
+    console.error('NO GOOGLE CLIENT ID SET!!! Set REACT_APP_GOOGLE_CLIENT_ID in file: .env');
+  }
+
   const showToast = (severity, summary, detail) => {
     toast.current.show({
       severity: severity,
@@ -40,6 +44,13 @@ function App() {
 
   const processCreds = (creds, notify = true) => {
     const userInfo = parseJwt(creds.credential);
+    const currentTime = Math.floor(Date.now() / 1000);
+    if (userInfo.exp < currentTime) {
+      localStorage.removeItem('userCreds');
+      setUser(null);
+      return;
+    }
+
     if (notify) {
       showToast('success', 'Login Successful', 'Welcome ' + userInfo.name);
     }
@@ -70,7 +81,7 @@ function App() {
     } else {
       return (
         <div>
-          <h1>Details</h1>
+          <h1>User Details</h1>
           <p>Welcome {user.name}</p>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
             <img src={user.picture} alt="User" />
