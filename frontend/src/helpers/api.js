@@ -1,71 +1,62 @@
-const API_BASE = 'https://links.ebolton.site'
-
-export const getLinks = async (offset, n) => {
-    const queryString = new URLSearchParams({
-        offset: offset || 0,
-        n: n || 10,
-    }).toString();
-
-    const result = await fetch(
-        `${API_BASE}/links?${queryString}`,
-        {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        }
-    );
-
-    if (!result.ok) {
-        throw new Error(`HTTP response error: ${result.status}`);
-    };
-
-    const links = await result.json();
-    return links;
+const API_BASE = process.env.REACT_APP_API_BASE;
+if (!API_BASE) {
+    throw new Error('API_BASE is not set. Set in frontend/.env');
 }
 
-export const addLink = async (text) => {
-    const response = await fetch(`${API_BASE}/add`, {
+const createUser = async (userData) => {
+    const payload = {
+        provider_id: userData.sub,
+        provider: 'google',
+        name: userData.name,
+        email: userData.email,
+        details: userData,
+    }
+    const response = await fetch(`${API_BASE}/users`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ link: text }),
+        body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-        throw new Error('Failed to post link');
+        throw new Error('Failed to create user');
     }
 
     return response.json();
 };
 
-export const deleteLink = async (idx) => {
-    const response = await fetch(`${API_BASE}/delete/${idx}`, {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error('Failed to delete link');
-    }
-
-    return response.json();
-};
-
-export const getLinkPreview = async (url) => {
-    const response = await fetch(`${API_BASE}/preview?url=${encodeURIComponent(url)}`, {
+const getUser = async (userDetails) => {
+    const url = `${API_BASE}/users/${userDetails.sub}`;
+    const response = await fetch(url, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
         },
     });
 
-    if (!response.ok) {
-        throw new Error('Failed to fetch preview');
+    if (!response.ok && response.status === 404) {
+        // Fallback to creating a user if the current user is not found
+        return createUser(userDetails);
     }
 
     return response.json();
+};
+
+const updateUser = async (userId, changes) => {
+    const response = await fetch(`${API_BASE}/users/${userId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(changes),
+    });
+
+    return response.json();
+};
+
+module.exports = {
+    createUser,
+    getUser,
+    updateUser,
 };
