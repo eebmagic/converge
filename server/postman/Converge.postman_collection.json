@@ -1,0 +1,125 @@
+{
+	"info": {
+		"_postman_id": "8c878c70-6d42-4e9f-8119-2b299a0c5623",
+		"name": "Converge",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "16002837"
+	},
+	"item": [
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"test-user@domain.com\",\n    \"provider\": \"fake-test-provider\",\n    \"provider_id\": \"{{user_id}}\",\n    \"details\": {\n        \"aud\": \"random-value-from-provider\",\n        \"azp\": \"random-value-from-provider\",\n        \"email\": \"test-user@domain.com\",\n        \"email_verified\": false,\n        \"exp\": 1746992466,\n        \"family_name\": \"User\",\n        \"given_name\": \"Test\",\n        \"iat\": 1746988866,\n        \"iss\": \"https://accounts.google.com\",\n        \"jti\": \"abcd-random-value-from-provider\",\n        \"name\": \"Test User\",\n        \"nbf\": 1746988566,\n        \"picture\": \"https://jollycontrarian.com/images/6/6c/Rickroll.jpg\",\n        \"sub\": \"{{user_id}}\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{converge_url}}/users",
+							"host": [
+								"{{converge_url}}"
+							],
+							"path": [
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{converge_url}}/users/{{user_id}}",
+							"host": [
+								"{{converge_url}}"
+							],
+							"path": [
+								"users",
+								"{{user_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Name\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{converge_url}}/users/{{user_id}}",
+							"host": [
+								"{{converge_url}}"
+							],
+							"path": [
+								"users",
+								"{{user_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "port",
+			"value": "3024",
+			"type": "string"
+		},
+		{
+			"key": "converge_url",
+			"value": "localhost:{{port}}",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "123456789-test-user-id",
+			"type": "string"
+		}
+	]
+}
