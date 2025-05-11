@@ -1,192 +1,255 @@
-import uuid
-import json
 import os
+import uuid
 from datetime import datetime
-from datetime import timezone
-import sys
-
-hyper_preview_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hyperlink_preview")
-sys.path.append(hyper_preview_path)
-
-# Library imports
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import hyperlink_preview as HLP
+from pymongo import MongoClient
+import numpy as np
+from tqdm import tqdm
 
+### 1. Load GloVe embeddings for cosine similarity calculations ###
+def load_glove(fpath):
+    embeddings = {}
+    with open(fpath, 'r', encoding='utf-8') as f:
+        for line in tqdm(f, desc="Loading GloVe"):
+            parts = line.strip().split()
+            word = parts[0]
+            vec  = np.array(parts[1:], dtype=np.float32)
+            embeddings[word] = vec
+    return embeddings
+
+def cos_sim(a, b):
+    """
+    Compute cosine similarity between two vectors a and b.
+    Returns a Python float between -1.0 and 1.0.
+    """
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+GLOVE_PATH = os.environ.get('GLOVE_PATH', 'glove.6B.100d.txt')
+glove_embeddings = load_glove(GLOVE_PATH)
+
+### 2. Flask & Mongo setup ###
 app = Flask(__name__,
     static_folder='../frontend/build',
     static_url_path='')
 CORS(app)
 
+MONGO_URI   = os.environ.get('MONGO_URI', 'mongodb://localhost:27017')
+mongo       = MongoClient(MONGO_URI)
+db          = mongo.wavelength
+games_coll  = db.games
+rounds_coll = db.rounds
 
-FILE = 'data.json'
+### 3. Helper functions ###
+def get_optimal_word(gameID, roundNumber):
+    """
+    For roundNumber > 1, fetch previous round's two guesses,
+    compute their centroid embedding, and find the vocab word
+    with highest cosine similarity to that centroid. Returns None
+    if insufficient data or embeddings missing.
+    """
+    if roundNumber <= 1:
+        return None
+    prev = rounds_coll.find_one({'gameID': gameID, 'roundNumber': roundNumber - 1})
+    if not prev or len(prev.get('guesses', [])) < 2:
+        return None
+    vecs = []
+    for g in prev['guesses']:
+        v = glove_embeddings.get(g['word'])
+        if v is None:
+            return None
+        vecs.append(v)
+    centroid = np.mean(vecs, axis=0)
+    best_word = None
+    best_sim  = -1.0
+    for w, vec in glove_embeddings.items():
+        sim = cos_sim(vec, centroid)
+        if sim > best_sim:
+            best_sim  = sim
+            best_word = w
+    return best_word
 
-def checkfile():
-    datafile = os.path.join(os.path.dirname(__file__), FILE)
-    if not os.path.exists(datafile):
-        with open(datafile, 'w') as file:
-            json.dump([], file)
 
-    with open(datafile) as file:
-        content = file.read()
+def compute_round_results(gameID, roundNumber):
+    """
+    Fetch the round doc, compute each guess's similarity to optimalWord,
+    and the similarity between the two guesses (playerSim).
+    Returns (entries_list, playerSim).
+    """
+    rd = rounds_coll.find_one({'gameID': gameID, 'roundNumber': roundNumber})
+    optimal_word = rd.get('optimalWord')
+    optimal_vec  = glove_embeddings.get(optimal_word)
 
-    if not content:
-        with open(datafile, 'w') as file:
-            json.dump([], file)
+    entries = []
+    guess_vecs = []
+    for guess in rd.get('guesses', []):
+        w   = guess['word']
+        vec = glove_embeddings.get(w)
+        sim = cos_sim(vec, optimal_vec) if (vec is not None and optimal_vec is not None) else None
+        entries.append({
+            'userID':       guess['userID'],
+            'word':         w,
+            'optimalSim':   sim
+        })
+        guess_vecs.append(vec)
 
-    return datafile
+    # compute similarity between the two guess vectors
+    if len(guess_vecs) == 2 and None not in guess_vecs:
+        playerSim = cos_sim(guess_vecs[0], guess_vecs[1])
+    else:
+        playerSim = None
+    return entries, playerSim
 
 
-def addToFile(link):
-    # Create emtpy file if os.path does not exist
-    datafile = checkfile()
+def serialize_game(doc):
+    d = doc.copy()
+    d.pop('_id', None)
+    return d
 
-    # Prepend to json file
-    datestr = datetime.now(timezone.utc).isoformat()
 
-    obj = {
-        'idx': uuid.uuid4().hex,
-        'link': link,
-        'date': datestr,
+def serialize_round(rdoc):
+    r = rdoc.copy()
+    r.pop('_id', None)
+    return r
+
+
+def get_full_game_state(gameID):
+    """
+    Helper to fetch and serialize a game with its full round history.
+    """
+    game = games_coll.find_one({'gameID': gameID})
+    if not game:
+        return None
+    rounds = list(rounds_coll.find({'gameID': gameID}).sort('roundNumber', 1))
+    payload = serialize_game(game)
+    payload['rounds'] = [serialize_round(r) for r in rounds]
+    return payload
+
+### 4. Endpoints ###
+
+# 4.1 Create a new game
+@app.route('/games', methods=['POST'])
+def create_game():
+    data   = request.get_json() or {}
+    gameID = data.get('gameID')
+    p1     = data.get('player1ID')
+    p2     = data.get('player2ID')
+    if not all([gameID, p1, p2]):
+        return jsonify({'error': 'Missing gameID or player IDs'}), 400
+
+    now = datetime.utcnow()
+    game = {
+        'gameID': gameID,
+        'player1ID': p1,
+        'player2ID': p2,
+        'currentRoundNumber': 1,
+        'status': 'in_progress',
+        'createdAt': now,
+        'updatedAt': now
     }
+    games_coll.insert_one(game)
+    return jsonify(serialize_game(game)), 200
 
-    try:
-        data = readfile()
-        data.insert(0, obj)
+# 4.2 Submit a guess (and possibly end or advance the game)
+@app.route('/games/<gameID>/rounds/<int:rn>/guess', methods=['POST'])
+def submit_guess(gameID, rn):
+    data   = request.get_json() or {}
+    userID = data.get('userID')
+    word   = data.get('word', '').strip().lower()
+    if not all([userID, word]):
+        return jsonify({'error': 'Missing userID or word'}), 400
 
-        with open(datafile, 'w') as file:
-            json.dump(data, file)
+    # Validate game & player IDs
+    game = games_coll.find_one({'gameID': gameID})
+    if not game or game['status'] != 'in_progress':
+        return jsonify({'error': 'Game not in progress'}), 400
+    if userID not in {game.get('player1ID'), game.get('player2ID')}:
+        return jsonify({'error': 'Invalid player'}), 403
 
-        return True
-    except Exception as e:
-        print(f'failed to add to file with e', e)
-        return False
+    now     = datetime.utcnow()
+    optimal = get_optimal_word(gameID, rn)
 
-def readfile():
-    datafile = checkfile()
-    with open(datafile) as file:
-        content = json.load(file)
+    # Upsert round with the guess
+    rounds_coll.update_one(
+        {'gameID': gameID, 'roundNumber': rn},
+        {
+          '$setOnInsert': {
+            'gameID':      gameID,
+            'roundNumber': rn,
+            'optimalWord': optimal,
+            'stage':       'collecting',
+            'startedAt':   now
+          },
+          '$push': {
+            'guesses': {
+              'userID':    userID,
+              'word':      word,
+              'timestamp': now
+            }
+          }
+        },
+        upsert=True
+    )
 
-    return content
+    rd = rounds_coll.find_one({'gameID': gameID, 'roundNumber': rn})
+    if len(rd.get('guesses', [])) < 2:
+        return jsonify({'success': True, 'roundStage': 'collecting'}), 200
 
-def deleteFromFile(idx):
-    datafile = checkfile()
-    try:
-        data = readfile()
-        data = [item for item in data if item['idx'] != idx]
+    # Score the round
+    entries, playerSim = compute_round_results(gameID, rn)
+    rounds_coll.update_one(
+        {'gameID': gameID, 'roundNumber': rn},
+        {'$set': {
+            'results.entries':   entries,
+            'results.playerSim': playerSim,
+            'stage':             'scored',
+            'endedAt':           now
+        }}
+    )
 
-        with open(datafile, 'w') as file:
-            json.dump(data, file)
+    # Win if same word
+    same = (entries[0]['word'] == entries[1]['word'])
+    if same:
+        games_coll.update_one(
+            {'gameID': gameID},
+            {'$set': {'status': 'won', 'updatedAt': now}}
+        )
+    else:
+        games_coll.update_one(
+            {'gameID': gameID},
+            {'$inc': {'currentRoundNumber': 1},
+             '$set': {'updatedAt': now}}
+        )
 
-        return True
-    except Exception as e:
-        print(f'failed to delete from file with e', e)
-        return False
+    # Return full game state
+    payload = get_full_game_state(gameID)
+    return jsonify({'success': True, 'roundStage': 'scored', 'game': payload}), 200
 
-
-# Serve React App
-@app.route('/')
-def serve():
-    print(f'Serving static files from {app.static_folder}')
-    return send_from_directory(app.static_folder, 'index.html')
-
-@app.route('/links', methods=['GET'])
-def get_signin_url():
-    '''
-    Get all the last N links in the board.
-    '''
-    # Get request args
-    offset = int(request.args.get('offset') or 0)
-    n = int(request.args.get('n') or 10)
-
-    # Read from the file
-    data = readfile()
-    payload = data[offset:offset+n]
-
-    # Return payload
+# 4.3 Get game state + history
+@app.route('/games/<gameID>', methods=['GET'])
+def get_game_state(gameID):
+    payload = get_full_game_state(gameID)
+    if not payload:
+        return jsonify({'error': 'Game not found'}), 404
     return jsonify(payload), 200
 
+# 4.4 End game (mark as lost)
+@app.route('/games/<gameID>/end', methods=['POST'])
+def end_game(gameID):
+    res = games_coll.update_one(
+        {'gameID': gameID},
+        {'$set': {'status': 'lost', 'updatedAt': datetime.utcnow()}}
+    )
+    if res.matched_count == 0:
+        return jsonify({'error': 'Game not found'}), 404
 
-@app.route('/add', methods=['POST'])
-def login():
-    '''
-    POST a link to the board.
-    Will add to a file.
-    '''
-    # Get request args
-    link = request.json.get('link')
+    payload = get_full_game_state(gameID)
+    return jsonify(payload), 200
 
-    if not link:
-        return jsonify({'error': 'No link provided'}), 400
-
-    # Try to add to the file
-    try:
-        success = addToFile(link)
-
-        if not success:
-            return jsonify({
-                'success': False,
-                'message': 'Server failed to post link',
-            }), 500
-
-        return jsonify({
-            'success': True,
-            'message': 'Added successully!',
-        }), 200
-    except Exception as e:
-        import traceback
-        print('Error posting link:', e)
-        print('Full stack trace:')
-        print(traceback.format_exc())
-        payload = {
-            'success': False,
-            'message': 'Server failed to post link',
-            'error': str(e),
-        }
-        return jsonify(payload), 500
-
-@app.route('/delete/<idx>', methods=['DELETE'])
-def delete_link(idx):
-    '''
-    DELETE a link from the board by its idx.
-    '''
-    try:
-        success = deleteFromFile(idx)
-
-        if not success:
-            return jsonify({
-                'success': False,
-                'message': 'Server failed to delete link',
-            }), 500
-
-        return jsonify({
-            'success': True,
-            'message': 'Deleted successfully!',
-        }), 200
-    except Exception as e:
-        print('Error deleting link:', e)
-        return jsonify({
-            'success': False,
-            'message': 'Server failed to delete link',
-            'error': str(e),
-        }), 500
-
-@app.route('/preview', methods=['GET'])
-def get_preview():
-    url = request.args.get('url')
-    if not url:
-        return jsonify({'error': 'No URL provided'}), 400
-
-    try:
-        preview = HLP.HyperLinkPreview(url=url)
-        preview = preview.get_data()
-        return jsonify(preview), 200
-    except Exception as e:
-        print('Error fetching preview:', e)
-        return jsonify({
-            'error': 'Failed to fetch preview',
-            'message': str(e)
-        }), 500
+# 4.5 Serve frontend
+@app.route('/')
+def serve():
+    return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=3024)
+    app.run(debug=True, port=int(os.environ.get('PORT', 3024)))
