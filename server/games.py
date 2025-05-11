@@ -62,7 +62,6 @@ def get_optimal_word(gameID, roundNumber):
             best_word = w
     return best_word
 
-
 def compute_round_results(gameID, roundNumber):
     """
     Fetch the round doc, compute each guess's similarity to optimalWord,
@@ -117,6 +116,9 @@ def get_full_game_state(gameID):
 
 # 3.1.1 Create a new game
 def create_game(gameID, p1):
+    '''
+    Creates a new game doc
+    '''
     games_coll, _ = get_db_collections()
     if not all([gameID, p1]):
         return {'error': 'Missing gameID or player1ID', 'status_code': 400}
@@ -135,6 +137,9 @@ def create_game(gameID, p1):
 
 # 3.1.2 Join a game
 def join_game(gameID, p2):
+    '''
+    Updates a game doc to include a new player
+    '''
     games_coll, _ = get_db_collections()
     if not all([gameID, p2]):
         return {'error': 'Missing gameID or player2ID', 'status_code': 400}
@@ -227,11 +232,17 @@ def add_move(gameID, rn, userID, word):
 
 # 3.3 Get game history
 def get_game(gameID):
+    '''
+    Gets the full details for a game
+    '''
     payload = get_full_game_state(gameID)
     return state if state else None
 
 # 3.4 Quit game (mark as lost)
 def quit_game(gameID):
+    '''
+    Update a game state to reflect a user ended it ("gave up")
+    '''
     games_coll, _ = get_db_collections()
     res = games_coll.update_one(
         {'gameID': gameID},
