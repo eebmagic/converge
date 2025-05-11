@@ -41,11 +41,8 @@ function App() {
 
     // Get or create the user on the server
     try {
-      console.log('calling getUser');
       const response = await api.getUser(userInfo);
-      console.log('got response from api helper', response);
       if (response) {
-        console.log('got user', response);
         localStorage.setItem('userCreds', JSON.stringify(creds));
         setUser(response);
       } else {

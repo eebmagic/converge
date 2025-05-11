@@ -2,7 +2,6 @@ const API_BASE = process.env.REACT_APP_API_BASE;
 if (!API_BASE) {
     throw new Error('API_BASE is not set. Set in frontend/.env');
 }
-console.log('Using API_BASE', API_BASE);
 
 const createUser = async (userData) => {
     const payload = {
