@@ -1,5 +1,6 @@
 # Local imports
 from mongoInterface import db
+import utils
 
 def create_user(user_data):
     '''
@@ -34,7 +35,7 @@ def create_user(user_data):
 
     # Create the user
     create_result = db.users.insert_one(user_data)
-    return {'user_id': create_result.inserted_id}, 200
+    return {'user_id': str(create_result.inserted_id)}, 200
 
 def get_user(user_id):
     '''
@@ -48,7 +49,8 @@ def get_user(user_id):
     if not user:
         return {'error': 'User not found'}, 404
 
-    return user, 200
+    user_safe = utils.safe_bson(user)
+    return user_safe, 200
 
 
 def update_user(user_id, changes):

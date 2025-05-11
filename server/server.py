@@ -3,15 +3,17 @@ import json
 import os
 from datetime import datetime
 from datetime import timezone
-import sys
-
-hyper_preview_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hyperlink_preview")
-sys.path.append(hyper_preview_path)
-
+import traceback
 # Library imports
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import hyperlink_preview as HLP
+from dotenv import load_dotenv
+
+# Local imports
+import users
+
+# Start server
+load_dotenv()
 
 app = Flask(__name__,
     static_folder='../frontend/build',
@@ -134,7 +136,6 @@ def login():
             'message': 'Added successully!',
         }), 200
     except Exception as e:
-        import traceback
         print('Error posting link:', e)
         print('Full stack trace:')
         print(traceback.format_exc())
@@ -188,5 +189,53 @@ def get_preview():
             'message': str(e)
         }), 500
 
+@app.route('/users', methods=['POST'])
+def create_user():
+    '''
+    Create a new user
+    '''
+    try:
+        user_data = request.json
+        response, code = users.create_user(user_data)
+        return jsonify(response), code
+    except Exception as e:
+        print('Error creating user:', e)
+        return jsonify({
+            'error': f'Error creating user: {e}',
+            'stack': traceback.format_exc()
+        }), 500
+
+@app.route('/users/<user_id>', methods=['GET'])
+def get_user(user_id):
+    '''
+    Get a user by their id.
+    '''
+    try:
+        response, code = users.get_user(user_id)
+        return jsonify(response), code
+    except Exception as e:
+        print('Error getting user:', e)
+        return jsonify({
+            'error': f'Error getting user: {e}',
+            'stack': traceback.format_exc()
+        }), 500
+
+@app.route('/users/<user_id>', methods=['PATCH'])
+def update_user(user_id):
+    '''
+    Update a user by their id.
+    '''
+    try:
+        changes = request.json
+        response, code = users.update_user(user_id, changes)
+        return jsonify(response), code
+    except Exception as e:
+        print('Error updating user:', e)
+        return jsonify({
+            'error': f'Error updating user: {e}',
+            'stack': traceback.format_exc()
+        }), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=3024)
+    port = int(os.getenv('PORT', 3024))
+    app.run(debug=True, port=port)
