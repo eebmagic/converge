@@ -222,7 +222,8 @@ def get_game(game_id):
     Get a game by its id
     '''
     try:
-        result, code = games.get_game(game_id=game_id)
+        user_id = request.json.get('user')
+        result, code = games.get_game(game_id=game_id, user_id=user_id)
         return jsonify(result), code
     except Exception as e:
         print('Error getting game:', e)

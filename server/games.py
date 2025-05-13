@@ -68,13 +68,16 @@ def get_games(user_id):
     }
     return utils.safe_bson(response), 200
 
-def get_game(game_id):
+def get_game(game_id, user_id):
     '''
     Gets the full details for a game
     '''
     game = db.games.find_one({'_id': bson.ObjectId(game_id)})
     if not game:
         return {'error': 'Game not found'}, 404
+    
+    if user_id != game['player1'] and user_id != game['player2']:
+        return {'error': 'User not involved in game'}, 403
 
     # TODO: Enrich with actual details
     return utils.safe_bson(game), 200
