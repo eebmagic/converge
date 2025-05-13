@@ -196,7 +196,9 @@ def create_game():
     Create a new game
     '''
     try:
-        user_id = request.json.get('user')
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+
         result, code = games.create_game(user_id=user_id)
         return jsonify(result), code
     except Exception as e:
@@ -209,7 +211,9 @@ def get_games():
     Get all games
     '''
     try:
-        user_id = request.json.get('user')
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+
         result, code = games.get_games(user_id=user_id)
         return jsonify(result), code
     except Exception as e:
@@ -222,7 +226,9 @@ def get_game(game_id):
     Get a game by its id
     '''
     try:
-        user_id = request.json.get('user')
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+
         result, code = games.get_game(game_id=game_id, user_id=user_id)
         return jsonify(result), code
     except Exception as e:
