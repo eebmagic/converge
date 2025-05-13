@@ -59,12 +59,17 @@ def get_games(user_id):
         return {'error': 'User not found'}, 404
 
     # Get all games that the user is involved in
-    games = db.games.find({'player1': user_id})
+    games = db.games.find({
+        '$or': [
+            {'player1': user_id},
+            {'player2': user_id}
+        ]
+    })
 
     # TODO: Enrich with actual details
     response = {
         'user': user,
-        'games': [str(game['_id']) for game in games],
+        'games': [utils.safe_bson(game) for game in games],
     }
     return utils.safe_bson(response), 200
 
@@ -75,7 +80,7 @@ def get_game(game_id, user_id):
     game = db.games.find_one({'_id': bson.ObjectId(game_id)})
     if not game:
         return {'error': 'Game not found'}, 404
-    
+
     if user_id != game['player1'] and user_id != game['player2']:
         return {'error': 'User not involved in game'}, 403
 
