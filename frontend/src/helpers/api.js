@@ -55,8 +55,47 @@ const updateUser = async (userId, changes) => {
     return response.json();
 };
 
+const createGame = async (userId) => {
+    const response = await fetch(`${API_BASE}/games`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Custom-Data': JSON.stringify({ user: userId }),
+        },
+    });
+
+    return response.json();
+};
+
+const getGames = async (userId) => {
+    const response = await fetch(`${API_BASE}/games`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Custom-Data': JSON.stringify({ user: userId }),
+        },
+    });
+
+    return response.json();
+};
+
+const getGame = async (gameId, userId) => {
+    const response = await fetch(`${API_BASE}/games/${gameId}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Custom-Data': JSON.stringify({ user: userId }),
+        },
+    });
+
+    return response.json();
+};
+
 module.exports = {
     createUser,
     getUser,
     updateUser,
+    createGame,
+    getGames,
+    getGame,
 };
