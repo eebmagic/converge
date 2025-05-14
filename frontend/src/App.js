@@ -1,21 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './App.css';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
 import { Toast } from 'primereact/toast';
 import { Button } from 'primereact/button';
+import { Menubar } from 'primereact/menubar';
 
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
-import githubMark from './images/github-mark.svg';
+import GamesList from './components/GamesList';
+import GameView from './components/GameView';
+import UserDetails from './components/UserDetails';
+
 import api from './helpers/api';
 import utils from './helpers/utils';
+import { UserProvider, useUser } from './contexts/UserContext';
 
 
-function App() {
+function AppContent() {
   const toast = useRef(null);
-  const [user, setUser] = useState(null);
+  const { user, setUser } = useUser();
 
   if (!process.env.REACT_APP_GOOGLE_CLIENT_ID) {
     console.error('NO GOOGLE CLIENT ID SET!!! Set REACT_APP_GOOGLE_CLIENT_ID in file: .env');
@@ -64,60 +70,83 @@ function App() {
         processCreds(JSON.parse(userCreds), false);
       }
     }
-  });
+  }, [user]);
 
-  function UserDetails() {
-    if (!user) {
-      return (
-        <div>
+  const menuItems = [
+    {
+      label: 'Home',
+      icon: 'pi pi-home',
+      url: '/',
+    },
+    {
+      label: 'Games',
+      icon: 'pi pi-comments',
+    },
+    {
+      label: 'GitHub',
+      icon: 'pi pi-github',
+      command: () => {window.open('https://github.com/eebmagic/converge', '_blank')}
+    }
+  ]
+
+  return (
+    <div className="App">
+      <Toast ref={toast} />
+      <Menubar model={menuItems} end={<UserDetails />} />
+      <header className="App-header">
+        {!user && (
           <GoogleLogin
             onSuccess={processCreds}
             onError={() => {
-              console.log('Login Failed');
+              console.error('Login Failed');
               showToast('error', 'Login Failed', 'Please try again');
             }}
           />
-        </div>
-      )
-    } else {
-      return (
-        <div>
-          <h1>User Details</h1>
-          <p>Welcome {user.name}</p>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-            <img src={user.details.picture} alt="User" />
-          </div>
-          <Button label="Logout" severity="danger" iconPos="right" icon="pi pi-sign-out" onClick={() => {
-            localStorage.removeItem('userCreds');
-            setUser(null);
-          }} />
-        </div>
-      )
-    }
-  };
+        )}
+        {user && (
+          <Routes>
+            <Route path="/" element={
+              <div>
+                <Button
+                  label="Create Game"
+                  severity="success"
+                  iconPos="right"
+                  icon="pi pi-plus"
+                  onClick={async () => {
+                    console.log('Creating game from user:', user);
+                    const result = await api.createGame(user.provider_id);
+                    console.log('Result from createGame:', result);
+                  }}
+                />
+                <Button
+                  label="Logout"
+                  severity="danger"
+                  iconPos="right"
+                  icon="pi pi-sign-out"
+                  onClick={() => {
+                    localStorage.removeItem('userCreds');
+                    setUser(null);
+                  }}
+                />
+                <GamesList user={user} />
+              </div>
+            } />
+            <Route path="/usergame/:gameId" element={<GameView user={user} />} />
+          </Routes>
+        )}
+      </header>
+    </div>
+  );
+}
 
+function App() {
   return (
     <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
-      <div className="App">
-        <Toast ref={toast} />
-        <header className="App-header">
-        <a
-          href="https://github.com/eebmagic/wavelength-game"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            position: 'absolute',
-            top: '10px',
-            left: '10px'
-          }}
-        >
-          <img src={githubMark} alt="GitHub Mark" style={{ width: '30px', height: '30px', filter: 'invert(100%)' }} />
-        </a>
-
-          <UserDetails />
-
-        </header>
-      </div>
+      <UserProvider>
+        <BrowserRouter>
+          <AppContent /> {/* TODO: Rename this to something like CoreRoutes or HomePage and move ot its own file*/}
+        </BrowserRouter>
+      </UserProvider>
     </GoogleOAuthProvider>
   );
 }
