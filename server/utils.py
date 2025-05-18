@@ -1,9 +1,20 @@
+import bson
+import json
 import os
 import re
 import random
 import numpy as np
 from tqdm import tqdm
 from client import mongo_client
+
+def safe_bson(bson_obj):
+    '''
+    Converts a bson object (with some non-json items) and converts it to a json object
+    '''
+    json_string = bson.json_util.dumps(bson_obj)
+    json_obj = json.loads(json_string)
+
+    return json_obj
 
 # Initialize collections
 db = mongo_client.wavelength
@@ -113,4 +124,3 @@ def serialize_doc(doc):
     d = doc.copy()
     d.pop('_id', None)
     return d
-
