@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 # Local imports
 import users
+import games
 
 # Start server
 load_dotenv()
@@ -188,6 +189,67 @@ def get_preview():
             'error': 'Failed to fetch preview',
             'message': str(e)
         }), 500
+
+@app.route('/games', methods=['POST'])
+def create_game():
+    '''
+    Create a new game
+    '''
+    try:
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+
+        result, code = games.create_game(user_id=user_id)
+        return jsonify(result), code
+    except Exception as e:
+        print('Error creating game:', e)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/games', methods=['GET'])
+def get_games():
+    '''
+    Get all games
+    '''
+    try:
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+
+        result, code = games.get_games(user_id=user_id)
+        return jsonify(result), code
+    except Exception as e:
+        print('Error getting games:', e)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/games/<game_id>', methods=['GET'])
+def get_game(game_id):
+    '''
+    Get a game by its id
+    '''
+    try:
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+
+        result, code = games.get_game(game_id=game_id, user_id=user_id)
+        return jsonify(result), code
+    except Exception as e:
+        print('Error getting game:', e)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/games/join', methods=['POST'])
+def join_game():
+    '''
+    Join a game by its id
+    '''
+    try:
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+        game_phrase = request.json.get('game_phrase')
+
+        result, code = games.join_game(game_phrase=game_phrase, user_id=user_id)
+        return jsonify(result), code
+    except Exception as e:
+        print('Error joining game:', e)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/users', methods=['POST'])
 def create_user():
