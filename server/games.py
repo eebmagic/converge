@@ -81,6 +81,7 @@ def join_game(game_phrase, user_id):
         {'_id': usableId},
         {'$set': {
             'player2': user_id,
+            'game_state': 'in_progress',
             'updated_at': datetime.now(),
             'updated_by': user_id,
         }},
@@ -117,6 +118,22 @@ def get_games(user_id):
         'user': user,
         'games': [utils.safe_bson(game) for game in games],
     }
+
+    # Enrich game objects with user details
+    userCache = {}
+    for game in response['games']:
+        # Pull user data
+        p1 = userCache.get(game['player1'], db.users.find_one({'provider_id': game['player1']}, {'_id': 0}))
+        p2 = userCache.get(game['player2'], db.users.find_one({'provider_id': game['player2']}, {'_id': 0}))
+
+        # Save to cache for other games in list
+        userCache[game['player1']] = p1
+        userCache[game['player2']] = p2
+
+        # Enrich game with user details
+        game['player1'] = utils.safe_bson(p1)
+        game['player2'] = utils.safe_bson(p2)
+
     return utils.safe_bson(response), 200
 
 def get_game(game_id, user_id):
@@ -130,7 +147,10 @@ def get_game(game_id, user_id):
     if user_id != game['player1'] and user_id != game['player2']:
         return {'error': 'User not involved in game'}, 403
 
-    # TODO: Enrich with actual details
+    # Enrich game with user details
+    game['player1'] = utils.safe_bson(db.users.find_one({'provider_id': game['player1']}, {'_id': 0}))
+    game['player2'] = utils.safe_bson(db.users.find_one({'provider_id': game['player2']}, {'_id': 0}))
+
     return utils.safe_bson(game), 200
 
 def get_game_by_phrase(game_phrase, user_id):

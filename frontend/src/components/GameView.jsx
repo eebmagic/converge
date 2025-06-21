@@ -26,8 +26,10 @@ function GameView({ user }) {
             {game && (
                 <div key={game._id}>
                     <h2>{game.key_phrase}</h2>
-                    <p>player 1: {game.player1}</p>
-                    <p>player 2: {game.player2}</p>
+                    <p>player 1: {game.player1.name}</p>
+                    <img src={game.player1.details.picture} alt="player 1 avatar" />
+                    <p>player 2: {game.player2.name}</p>
+                    <img src={game.player2.details.picture} alt="player 2 avatar" />
                     <p>status: {game.game_state}</p>
                 </div>
             )}
