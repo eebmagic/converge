@@ -13,6 +13,7 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import GamesList from './components/GamesList';
 import GameView from './components/GameView';
 import UserDetails from './components/UserDetails';
+import JoinGame from './components/JoinGame';
 
 import api from './helpers/api';
 import utils from './helpers/utils';
@@ -119,6 +120,15 @@ function AppContent() {
                   }}
                 />
                 <Button
+                  label="Join Game"
+                  severity="info"
+                  iconPos="right"
+                  icon="pi pi-sign-in"
+                  onClick={() => {
+                    window.location.href = '/join';
+                  }}
+                />
+                <Button
                   label="Logout"
                   severity="danger"
                   iconPos="right"
@@ -132,6 +142,7 @@ function AppContent() {
               </div>
             } />
             <Route path="/usergame/:gameId" element={<GameView user={user} />} />
+            <Route path="/join" element={<JoinGame user={user} />} />
           </Routes>
         )}
       </header>

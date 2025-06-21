@@ -91,6 +91,19 @@ const getGame = async (gameId, userId) => {
     return response.json();
 };
 
+const joinGame = async (gamePhrase, userId) => {
+    const response = await fetch(`${API_BASE}/games/join`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Custom-Data': JSON.stringify({ user: userId }),
+        },
+        body: JSON.stringify({ game_phrase: gamePhrase }),
+    });
+
+    return response.json();
+};
+
 module.exports = {
     createUser,
     getUser,
@@ -98,4 +111,5 @@ module.exports = {
     createGame,
     getGames,
     getGame,
+    joinGame,
 };
