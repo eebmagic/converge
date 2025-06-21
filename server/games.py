@@ -43,11 +43,57 @@ def create_game(user_id):
 
     return str(insert_result.inserted_id), 200
 
-def join_game(game_id, user_id):
+def join_game(game_phrase, user_id):
     '''
     Updates a game doc to include a new player
     '''
-    pass
+    print('inside join_game:', game_phrase)
+
+    if not user_id:
+        return {'error': 'No user id provided'}, 400
+    
+    if not game_phrase:
+        return {'error': 'No game phrase provided'}, 400
+
+    game, code = get_game_by_phrase(game_phrase, user_id)
+    if code != 200:
+        return game, code
+    
+    print('found game:', game)
+
+    # If game is full, return error
+    if game['player2']:
+        if user_id in [game['player1'], game['player2']]:
+            return utils.safe_bson(game), 200
+        else:
+            return {'error': 'Game is full'}, 403
+    
+    # If user is already in game, return error
+    if user_id == game['player1']:
+        return {'error': 'You cannot join your own game'}, 400
+
+    # Update game doc to include new player
+    print('game id:', game['_id'], type(game['_id']))
+    usableId = bson.ObjectId(game['_id']['$oid'])
+    print('usableId:', usableId, type(usableId))
+    print('user_id:', user_id, type(user_id))
+    result = db.games.find_one_and_update(
+        {'_id': usableId},
+        {'$set': {
+            'player2': user_id,
+            'updated_at': datetime.now(),
+            'updated_by': user_id,
+        }},
+        return_document=True
+    )
+    print('result:', result)
+
+    # Check that the update was successful
+    if not result:
+        return {'error': 'Failed to update game while joining'}, 500
+
+    # Return the updated game
+    return utils.safe_bson(result), 200
 
 def get_games(user_id):
     '''
@@ -85,6 +131,26 @@ def get_game(game_id, user_id):
         return {'error': 'User not involved in game'}, 403
 
     # TODO: Enrich with actual details
+    return utils.safe_bson(game), 200
+
+def get_game_by_phrase(game_phrase, user_id):
+    '''
+    Gets a game by its key phrase
+    '''
+    game = db.games.find_one({'key_phrase': game_phrase})
+
+    # If game not found, return error
+    if not game:
+        return {'error': 'Game not found'}, 404
+    
+    # If player in game, return game
+    if user_id == game['player1'] or user_id == game['player2']:
+        return utils.safe_bson(game), 200
+    
+    # If game full already and user not involved, return error
+    if game['player2'] and user_id != game['player1'] and user_id != game['player2']:
+        return {'error': 'Game not found'}, 403
+
     return utils.safe_bson(game), 200
 
 def add_move(game_id, user_id, word):
