@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
+import { Chart } from 'primereact/chart';
+import { Card } from 'primereact/card';
 import api from '../helpers/api';
 
 function GameView({ user }) {
@@ -70,11 +72,63 @@ function GameView({ user }) {
         historyData.reverse();
 
         return (
-            <DataTable value={historyData} tableStyle={{ minWidth: '50rem' }}>
-                <Column field="round" header="Round"></Column>
-                <Column field="player1Move" header="Your Moves"></Column>
-                <Column field="player2Move" header="Their Moves"></Column>
-            </DataTable>
+            <div>
+                <Card title="Game History">
+                    <DataTable value={historyData} tableStyle={{ minWidth: '50rem' }}>
+                        <Column field="round" header="Round"></Column>
+                        <Column field="player1Move" header="Your Moves"></Column>
+                        <Column field="player2Move" header="Their Moves"></Column>
+                    </DataTable>
+                </Card>
+            </div>
+        );
+    }
+
+    const scoresWidget = () => {
+        if (!game) return;
+        if (game.game_state !== 'in_progress') return;
+        
+        const scores = game.scores;
+        const labels = scores.map((score, index) => `${index + 1}`);
+        const pointStyles = scores.map((score) => score >= 1 ? 'rectRot' : 'circle');
+        const pointRadius = scores.map((score) => score >= 1 ? 10 : 3);
+        const pointColors = scores.map((score) => score >= 1 ? 'yellow' : 'aqua');
+
+        const chartData = {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Score',
+                    data: scores,
+                    pointStyle: pointStyles,
+                    pointRadius: pointRadius,
+                    pointBackgroundColor: pointColors,
+                    tension: 0.4,
+                },
+            ],
+        };
+
+        const options = {
+            scales: {
+                y: {
+                    max: 1.1,
+                    beginAtZero: true,
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Round',
+                    },
+                },
+            },
+        };
+
+        return (
+            <div>
+                <Card title="Scores">
+                    <Chart type="line" data={chartData} options={options} />
+                </Card>
+            </div>
         );
     }
 
@@ -91,11 +145,8 @@ function GameView({ user }) {
                     <p>status: {game.game_state}</p>
 
                     {submitWidget()}
-
-                    <div>
-                        <h2>Game History</h2>
-                        {historyWidget()}
-                    </div>
+                    {game.scores.length > 0 && scoresWidget()}
+                    {game.player1_moves.length > 0 && game.player2_moves.length > 0 && historyWidget()}
                 </div>
             )}
         </div>
