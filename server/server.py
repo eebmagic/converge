@@ -259,7 +259,7 @@ def add_move(game_id):
     try:
         header_data = request.headers.get('X-Custom-Data')
         user_id = json.loads(header_data).get('user')
-        word = request.json.get('word')
+        word = request.json.get('word').strip().lower()
 
         result, code = games.add_move(game_id=game_id, user_id=user_id, word=word)
         return jsonify(result), code

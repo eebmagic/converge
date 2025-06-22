@@ -6,6 +6,7 @@ from datetime import datetime
 # Local imports
 from mongoInterface import db
 import utils
+import ling
 
 def create_game(user_id):
     '''
@@ -226,29 +227,60 @@ def add_move(game_id, user_id, word):
             print('breaking because player 2 is already ahead')
             return {'error': 'Waiting for user to submit their move'}, 400
 
+    # Check word is valid
+    if not ling.validate_word(word):
+        return {'error': 'Invalid word. Must appear in the word set.'}, 400
+
     # Add move to game
     moves_key = 'player1_moves' if user_id == game['player1'] else 'player2_moves'
+    payload = {
+        '$push': {
+            moves_key: word
+        },
+        '$set': {
+            'updated_at': datetime.now(),
+            'updated_by': user_id,
+        },
+    }
+
+    # Check if the game is over
+    if len(game['player1_moves']) > 0 and (len(game['player1_moves']) == len(game['player2_moves'])):
+        if game['player1_moves'][-1] == game['player2_moves'][-1]:
+            payload['$set'] = {'game_state': 'finished'}
+    
+
+    # Make update
     result = db.games.update_one(
         {'_id': bson.ObjectId(game_id)},
-        {'$push': {moves_key: word}},
-        # return_document=True
+        payload,
     )
     print('doc update result:', result)
 
-    # Check if the game is over
     if result.modified_count == 0:
         return {'error': 'Failed to add move'}, 500
 
-    # Check if the game is over
-    p1m = game['player1_moves']
-    p2m = game['player2_moves']
-    if len(p1m) > 0 and (len(p1m) == len(p2m)):
-        if p1m[-1] == p2m[-1]:
-            return {'error': 'Game is over'}, 400
+    # Check if score can be updated
+    game = db.games.find_one({'_id': bson.ObjectId(game_id)})
+    if len(game['player1_moves']) > 0 and (len(game['player1_moves']) == len(game['player2_moves'])):
+        if len(game['scores']) < len(game['player1_moves']):
+            ling_result = ling.score_words(game['player1_moves'][-1], game['player2_moves'][-1])
+            if ling_result:
+                print('ling result:', ling_result)
+                payload = {
+                    '$push': {
+                        'scores': ling_result['score'],
+                        'optimal_moves': ling_result['optimal'],
+                    }
+                }
+                result = db.games.update_one(
+                    {'_id': bson.ObjectId(game_id)},
+                    payload,
+                )
+
+                if result.modified_count == 0:
+                    return {'error': 'Failed to add score'}, 500
 
     return utils.safe_bson(game), 200
-
-
 
 
 def quit_game(game_id, user_id):
