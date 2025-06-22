@@ -11,6 +11,10 @@ function GameView({ user }) {
     const [word, setWord] = useState('');
     const sendMove = async (word) => {
         const result = await api.addMove(gameId, user.provider_id, word);
+        if (result.error) {
+            alert(result.error);
+            return;
+        }
         setGame(result);
     }
 
@@ -68,8 +72,8 @@ function GameView({ user }) {
         return (
             <DataTable value={historyData} tableStyle={{ minWidth: '50rem' }}>
                 <Column field="round" header="Round"></Column>
-                <Column field="player1Move" header="Player 1 Move"></Column>
-                <Column field="player2Move" header="Player 2 Move"></Column>
+                <Column field="player1Move" header="Your Moves"></Column>
+                <Column field="player2Move" header="Their Moves"></Column>
             </DataTable>
         );
     }
