@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
 import api from '../helpers/api';
 
 function GameView({ user }) {
@@ -50,15 +52,25 @@ function GameView({ user }) {
             return <p>No moves yet</p>;
         };
 
+        const minLength = Math.min(game.player1_moves.length, game.player2_moves.length);
+        const historyData = [];
+
+        for (let i = 0; i < minLength; i++) {
+            historyData.push({
+                round: i + 1,
+                player1Move: game.player1_moves[i],
+                player2Move: game.player2_moves[i]
+            });
+        }
+
+        historyData.reverse();
+
         return (
-            <div>
-                {game.player1_moves.map(word => {
-                    return <p>{word}</p>
-                })}
-                {game.player2_moves.map(word => {
-                    return <p>{word}</p>
-                })}
-            </div>
+            <DataTable value={historyData} tableStyle={{ minWidth: '50rem' }}>
+                <Column field="round" header="Round"></Column>
+                <Column field="player1Move" header="Player 1 Move"></Column>
+                <Column field="player2Move" header="Player 2 Move"></Column>
+            </DataTable>
         );
     }
 
