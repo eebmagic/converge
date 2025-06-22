@@ -2,11 +2,23 @@ import numpy as np
 
 
 FPATH = 'glove.6B.100d.txt'
-wordset = set()
+wordset = {}
 with open(FPATH, 'r', encoding='utf-8') as f:
     for line in f:
-        word = line.strip().split()[0]
-        wordset.add(word)
+        parts = line.strip().split()
+        word = parts[0]
+
+        if len(word) < 3:
+            continue
+        if not word.isalpha() or not word.isascii():
+            continue
+
+        # TODO: Filter the original dataset for this instead
+        # TODO: Also filter for english words only
+
+        vec = np.array(parts[1:], dtype=np.float32)
+        wordset[word] = vec
+
 
 print(f'Built wordset of {len(wordset):,} words')
 
@@ -31,19 +43,14 @@ def optimal_word(a, b, a_vec, b_vec):
     closest = None
     closest_dist = 0
 
-    with open(FPATH, 'r', encoding='utf-8') as f:
-        for line in f:
-            parts = line.strip().split()
-            word = parts[0]
-            if word in [a, b]:
-                continue
+    for word, vec in wordset.items():
+        if word in [a, b]:
+            continue
 
-            vec = np.array(parts[1:], dtype=np.float32)
-
-            dist = cos(middle, vec)
-            if dist > closest_dist:
-                closest_dist = dist
-                closest = word
+        dist = cos(middle, vec)
+        if dist > closest_dist:
+            closest_dist = dist
+            closest = word
 
     return closest
 
@@ -54,23 +61,8 @@ def score_words(word1, word2):
         - the cosine similarity between the two words
         - the optimal word (word between the two guesses)
     '''
-    a_vec = None
-    b_vec = None
-
-    with open(FPATH, 'r', encoding='utf-8') as f:
-        for line in f:
-            parts = line.strip().split()
-            word = parts[0]
-            if word == word1:
-                a_vec = np.array(parts[1:], dtype=np.float32)
-            if word == word2:
-                b_vec = np.array(parts[1:], dtype=np.float32)
-            
-            if a_vec is not None and b_vec is not None:
-                break
-
-    if a_vec is None or b_vec is None:
-        return None, None
+    a_vec = wordset[word1]
+    b_vec = wordset[word2]
     
     score = float(cos(a_vec, b_vec))
     optimal = optimal_word(word1, word2, a_vec, b_vec)
