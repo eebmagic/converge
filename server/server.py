@@ -251,6 +251,22 @@ def join_game():
         print('Error joining game:', e)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/games/<game_id>/move', methods=['POST'])
+def add_move(game_id):
+    '''
+    Add a move to a game
+    '''
+    try:
+        header_data = request.headers.get('X-Custom-Data')
+        user_id = json.loads(header_data).get('user')
+        word = request.json.get('word')
+
+        result, code = games.add_move(game_id=game_id, user_id=user_id, word=word)
+        return jsonify(result), code
+    except Exception as e:
+        print('Error adding move:', e)
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/users', methods=['POST'])
 def create_user():
     '''
